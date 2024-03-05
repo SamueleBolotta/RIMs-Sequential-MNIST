@@ -1,0 +1,2 @@
+[console_scripts]
+RIM = RIM:RIM
