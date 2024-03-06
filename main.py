@@ -63,8 +63,8 @@ def test_model(model, loader, func):
 	with torch.no_grad():
 		for i in tqdm(range(loader.val_len())):
 			test_x, test_y = func(i)
-			test_x = model.to_device(test_x)
-			test_y = model.to_device(test_y).long()
+			test_x = model.module.to_device(test_x)
+			test_y = model.module.to_device(test_y).long()
 			
 			probs  = model( test_x)
 
@@ -110,15 +110,15 @@ def train_model(model, epochs, data):
 		for i in tqdm(range(data.train_len())):
 			iter_ctr+=1.
 			inp_x, inp_y = data.train_get(i)
-			inp_x = model.to_device(inp_x)
-			inp_y = model.to_device(inp_y)
+			inp_x = model.module.to_device(inp_x)
+			inp_y = model.module.to_device(inp_y)
 			
 			output, l = model(inp_x, inp_y)
-			
+			l = l.mean()
 			optimizer.zero_grad()
 			l.backward()
 			optimizer.step()
-			norm += model.grad_norm()
+			norm += model.module.grad_norm()
 			epoch_loss += l.item()
 			preds = torch.argmax(output, dim=1)
 			
@@ -151,7 +151,9 @@ def train_model(model, epochs, data):
 
 data = MnistData(args['batch_size'], (args['size'], args['size']), args['k'])
 model = mode(args).cuda()
-
+if torch.cuda.device_count() > 1:
+	model = torch.nn.DataParallel(model)
+	
 if args['train']:
 	train_model(model, args['epochs'], data)
 else:
