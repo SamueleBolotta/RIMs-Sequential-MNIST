@@ -1,37 +1,27 @@
 import torch
 import torch.nn as nn
 import math
-
 import numpy as np
 import torch.multiprocessing as mp
 
-
 class blocked_grad(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, x, mask):
         ctx.save_for_backward(x, mask)
         return x
-
     @staticmethod
     def backward(ctx, grad_output):
         x, mask = ctx.saved_tensors
         return grad_output * mask, mask * 0.0
 
-
 class GroupLinearLayer(nn.Module):
-
     def __init__(self, din, dout, num_blocks):
         super(GroupLinearLayer, self).__init__()
-
         self.w	 = nn.Parameter(0.01 * torch.randn(num_blocks,din,dout))
-
     def forward(self,x):
         x = x.permute(1,0,2)
-        
         x = torch.bmm(x,self.w)
         return x.permute(1,0,2)
-
 
 class GroupLSTMCell(nn.Module):
 	"""
@@ -45,7 +35,6 @@ class GroupLSTMCell(nn.Module):
 		self.i2h = GroupLinearLayer(inp_size, 4 * hidden_size, num_lstms)
 		self.h2h = GroupLinearLayer(hidden_size, 4 * hidden_size, num_lstms)
 		self.reset_parameters()
-
 
 	def reset_parameters(self):
 		stdv = 1.0 / math.sqrt(self.hidden_size)
@@ -73,7 +62,6 @@ class GroupLSTMCell(nn.Module):
 
 		return h_t, c_t
 
-
 class GroupGRUCell(nn.Module):
     """
     GroupGRUCell can compute the operation of N GRU Cells at once.
@@ -85,8 +73,6 @@ class GroupGRUCell(nn.Module):
         self.x2h = GroupLinearLayer(input_size, 3 * hidden_size, num_grus)
         self.h2h = GroupLinearLayer(hidden_size, 3 * hidden_size, num_grus)
         self.reset_parameters()
-
-
 
     def reset_parameters(self):
         std = 1.0 / math.sqrt(self.hidden_size)
@@ -110,11 +96,8 @@ class GroupGRUCell(nn.Module):
         inputgate = torch.sigmoid(i_i + h_i)
         newgate = torch.tanh(i_n + (resetgate * h_n))
         
-        hy = newgate + inputgate * (hidden - newgate)
-        
+        hy = newgate + inputgate * (hidden - newgate)        
         return hy
-
-
 
 class RIMCell(nn.Module):
 	def __init__(self, 
@@ -136,11 +119,9 @@ class RIMCell(nn.Module):
 		self.input_key_size = input_key_size
 		self.input_query_size = input_query_size
 		self.input_value_size = input_value_size
-
 		self.comm_key_size = comm_key_size
 		self.comm_query_size = comm_query_size
 		self.comm_value_size = comm_value_size
-
 		self.key = nn.Linear(input_size, num_input_heads * input_query_size).to(self.device)
 		self.value = nn.Linear(input_size, num_input_heads * input_value_size).to(self.device)
 
@@ -156,7 +137,6 @@ class RIMCell(nn.Module):
 		self.comm_attention_output = GroupLinearLayer(num_comm_heads * comm_value_size, comm_value_size, self.num_units)
 		self.comm_dropout = nn.Dropout(p =input_dropout)
 		self.input_dropout = nn.Dropout(p =comm_dropout)
-
 
 	def transpose_for_scores(self, x, num_attention_heads, attention_head_size):
 	    new_x_shape = x.size()[:-1] + (num_attention_heads, attention_head_size)
@@ -226,8 +206,7 @@ class RIMCell(nn.Module):
 	    new_context_layer_shape = context_layer.size()[:-2] + (self.num_comm_heads * self.comm_value_size,)
 	    context_layer = context_layer.view(*new_context_layer_shape)
 	    context_layer = self.comm_attention_output(context_layer)
-	    context_layer = context_layer + h
-	    
+	    context_layer = context_layer + h	    
 	    return context_layer
 
 	def forward(self, x, hs, cs = None):
@@ -248,7 +227,6 @@ class RIMCell(nn.Module):
 		if cs is not None:
 			c_old = cs * 1.0
 		
-
 		# Compute RNN(LSTM or GRU) output
 		
 		if cs is not None:
@@ -267,9 +245,7 @@ class RIMCell(nn.Module):
 		if cs is not None:
 			cs = mask * cs + (1 - mask) * c_old
 			return hs, cs
-
 		return hs, None
-
 
 class RIM(nn.Module):
 	def __init__(self, device, input_size, hidden_size, num_units, k, rnn_cell, n_layers, bidirectional, **kwargs):
