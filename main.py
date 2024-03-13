@@ -15,10 +15,8 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 parser = argparse.ArgumentParser()
-
 parser.add_argument('--cuda', type = str2bool, default = True, help = 'use gpu or not')
 parser.add_argument('--epochs', type = int, default = 100)
-
 parser.add_argument('--batch_size', type = int, default = 64)
 parser.add_argument('--hidden_size', type = int, default = 600)
 parser.add_argument('--input_size', type = int, default = 1)
@@ -33,12 +31,10 @@ parser.add_argument('--num_input_heads', type = int, default = 1)
 parser.add_argument('--num_comm_heads', type = int, default = 4)
 parser.add_argument('--input_dropout', type = float, default = 0.1)
 parser.add_argument('--comm_dropout', type = float, default = 0.1)
-
 parser.add_argument('--key_size_comm', type = int, default = 32)
 parser.add_argument('--value_size_comm', type = int, default = 100)
 parser.add_argument('--query_size_comm', type = int, default = 32)
 parser.add_argument('--k', type = int, default = 4)
-
 parser.add_argument('--size', type = int, default = 14)
 parser.add_argument('--loadsaved', type = int, default = 0)
 parser.add_argument('--log_dir', type = str, default = 'smnist_lstm_600')
@@ -56,22 +52,18 @@ else:
 	mode = MnistModel
 
 def test_model(model, loader, func):
-	
 	accuracy = 0
 	loss = 0
 	model.eval()
 	with torch.no_grad():
 		for i in tqdm(range(loader.val_len())):
 			test_x, test_y = func(i)
-			test_x = model.to_device(test_x)
-			test_y = model.to_device(test_y).long()
-			
+			test_x = model.module.to_device(test_x)
+			test_y = model.module.to_device(test_y).long()		
 			probs  = model( test_x)
-
 			preds = torch.argmax(probs, dim=1)
 			correct = preds == test_y
 			accuracy += correct.sum().item()
-
 	accuracy /= 100.0
 	return accuracy
 
@@ -80,7 +72,6 @@ def train_model(model, epochs, data):
 	lossstats=[]
 	best_acc = 0.0
 	ctr = 0	
-
 	test_acc = 0
 	start_epoch=0
 	ctr=0
@@ -99,8 +90,7 @@ def train_model(model, epochs, data):
 		model.load_state_dict(saved['net'])
 	optimizer = torch.optim.Adam(model.parameters(), lr = 0.0001)
 		
-	for epoch in range(start_epoch,epochs):
-		
+	for epoch in range(start_epoch,epochs):		
 		print('epoch ' + str(epoch + 1))
 		epoch_loss = 0.
 		iter_ctr = 0.
@@ -110,27 +100,23 @@ def train_model(model, epochs, data):
 		for i in tqdm(range(data.train_len())):
 			iter_ctr+=1.
 			inp_x, inp_y = data.train_get(i)
-			inp_x = model.to_device(inp_x)
-			inp_y = model.to_device(inp_y)
-			
+			inp_x = model.module.to_device(inp_x)
+			inp_y = model.module.to_device(inp_y)		
 			output, l = model(inp_x, inp_y)
-			
+			l = l.mean()
 			optimizer.zero_grad()
 			l.backward()
 			optimizer.step()
-			norm += model.grad_norm()
+			norm += model.module.grad_norm()
 			epoch_loss += l.item()
-			preds = torch.argmax(output, dim=1)
-			
+			preds = torch.argmax(output, dim=1)			
 			correct = preds == inp_y.long()
 			t_accuracy += correct.sum().item()
-
 			ctr += 1
 
 		v_accuracy1 = test_model(model, data, data.val_get1)
 		v_accuracy2 = test_model(model, data, data.val_get2)
-		v_accuracy3 = test_model(model, data, data.val_get3)
-		
+		v_accuracy3 = test_model(model, data, data.val_get3)		
 		print('best validation accuracy ' + str(best_acc))
 		print('Saving best model..')
 		state = {
@@ -151,7 +137,8 @@ def train_model(model, epochs, data):
 
 data = MnistData(args['batch_size'], (args['size'], args['size']), args['k'])
 model = mode(args).cuda()
-
+if torch.cuda.device_count() > 1:
+	model = torch.nn.DataParallel(model)	
 if args['train']:
 	train_model(model, args['epochs'], data)
 else:
@@ -159,6 +146,3 @@ else:
 	model.load_state_dict(saved['net'])
 	v_acc = test_model(model, data)
 	print('val_acc:'+str(v_acc))
-
-
-

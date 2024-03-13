@@ -14,7 +14,8 @@ class MnistModel(nn.Module):
 			self.device = torch.device('cpu')
 		self.rim_model = RIMCell(self.device, args['input_size'], args['hidden_size'], args['num_units'], args['k'], args['rnn_cell'], args['key_size_input'], args['value_size_input'] , args['query_size_input'],
 			args['num_input_heads'], args['input_dropout'], args['key_size_comm'], args['value_size_comm'], args['query_size_comm'], args['num_input_heads'], args['comm_dropout']).to(self.device)
-
+		# if torch.cuda.device_count() > 1:
+		# 	self.rim_model = torch.nn.DataParallel(self.rim_model)
 		self.Linear = nn.Linear(args['hidden_size'] * args['num_units'], 10)
 		self.Loss = nn.CrossEntropyLoss()
 
@@ -22,30 +23,25 @@ class MnistModel(nn.Module):
 		return torch.from_numpy(x).to(self.device)
 
 	def forward(self, x, y = None):
-		x = x.float()
-		
+		x = x.float()	
 		# initialize hidden states
 		hs = torch.randn(x.size(0), self.args['num_units'], self.args['hidden_size']).to(self.device)
 		cs = None
 		if self.args['rnn_cell'] == 'LSTM':
 			cs = torch.randn(x.size(0), self.args['num_units'], self.args['hidden_size']).to(self.device)
-
 		xs = torch.split(x, 1, 1)
-
 		# pass through RIMCell for all timesteps
 		for x in xs:
 			hs, cs = self.rim_model(x, hs, cs)
 		preds = self.Linear(hs.contiguous().view(x.size(0), -1))
-
 		if y is not None:
 			# Compute Loss
 			y = y.long()
 			probs = nn.Softmax(dim = -1)(preds)
 			entropy = torch.mean(torch.sum(probs*torch.log(probs), dim = 1))
-			loss = self.Loss(preds, y) - entropy
+			loss = torch.mean(self.Loss(preds, y) - entropy)
 			return probs, loss
 		return preds
-
 
 	def grad_norm(self):
 	    total_norm = 0
@@ -89,7 +85,6 @@ class LSTM(nn.Module):
 			loss = self.Loss(preds, y) - entropy
 			return probs, loss
 		return preds
-
 	
 	def grad_norm(self):
 	    total_norm = 0
@@ -98,4 +93,3 @@ class LSTM(nn.Module):
 	        total_norm += param_norm.item() ** 2
 	    total_norm = total_norm ** (1. / 2)
 	    return total_norm
-
