@@ -42,11 +42,14 @@ parser.add_argument('--k', type = int, default = 4)
 
 parser.add_argument('--size', type = int, default = 14)
 parser.add_argument('--loadsaved', type = int, default = 0)
-parser.add_argument('--log_dir', type = str, default = 'smnist_lstm_600')
+parser.add_argument('--log_dir_lstm', type=str, default='lstm_model_dir', help='Directory for saving/loading LSTM model checkpoints')
+parser.add_argument('--log_dir_rim', type=str, default='rim_model_dir', help='Directory for saving/loading RIM model checkpoints')
+
 
 args = vars(parser.parse_args())
 
-log_dir = args['log_dir']
+log_dir_lstm = args['log_dir_lstm']
+log_dir_rim = args['log_dir_rim']
 torch.manual_seed(10)
 np.random.seed(10)
 torch.cuda.manual_seed(10)
@@ -76,7 +79,7 @@ def test_model(model, loader, func):
 	accuracy /= 100.0
 	return accuracy
 
-def train_model(model, epochs, data):
+def train_model(model, epochs, data, log_dir):
     acc = []
     lossstats = []
     best_acc_sum = 0.0
@@ -85,9 +88,20 @@ def train_model(model, epochs, data):
     ctr = 0  # Ensure ctr is defined at the beginning
     
     if args['loadsaved'] == 1:
-        with open(log_dir + '/accstats.pickle', 'rb') as f:
+        if args['model'] == 'LSTM':
+            acc_stats_file = os.path.join(log_dir['lstm'], 'accstats.pickle')
+            loss_stats_file = os.path.join(log_dir['lstm'], 'lossstats.pickle')
+            model_checkpoint_file = os.path.join(log_dir['lstm'], 'lstm_best_model.pt')
+        elif args['model'] == 'RIM':
+            acc_stats_file = os.path.join(log_dir['rim'], 'accstats.pickle')
+            loss_stats_file = os.path.join(log_dir['rim'], 'lossstats.pickle')
+            model_checkpoint_file = os.path.join(log_dir['rim'], 'rim_best_model.pt')
+        else:
+            raise ValueError('Unsupported model type')
+        
+        with open(acc_stats_file, 'rb') as f:
             acc = pickle.load(f)
-        with open(log_dir + '/lossstats.pickle', 'rb') as f:
+        with open(loss_stats_file, 'rb') as f:
             losslist = pickle.load(f)
         start_epoch = len(acc) - 1
         best_acc = 0
@@ -95,7 +109,7 @@ def train_model(model, epochs, data):
             if i[0] > best_acc:
                 best_acc = i[0]
         ctr = len(losslist) - 1
-        saved = torch.load(log_dir + '/best_model.pt')
+        saved = torch.load(model_checkpoint_file)
         model.load_state_dict(saved['net'])
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
@@ -148,7 +162,7 @@ def train_model(model, epochs, data):
             model_filename = 'lstm_best_model.pt'
         elif args['model'] == 'RIM':
             model_dir = 'rim_model_dir'
-            model_filename = 'best_model.pt'
+            model_filename = 'rim_best_model.pt'
         else:
             raise ValueError('Unsupported model type')
 
@@ -168,8 +182,7 @@ def train_model(model, epochs, data):
                 torch.save(state, f)
         else:
             no_improvement_epochs += 1
-
-        if no_improvement_epochs >= 10:
+        if no_improvement_epochs >= 15:
             print(f'No improvement in validation accuracies sum for {no_improvement_epochs} epochs, stopping training.')
             break
 
@@ -183,9 +196,27 @@ else:
 
 
 if args['train']:
-	train_model(model, args['epochs'], data)
+    train_model(model, args['epochs'], data, {'lstm': args['log_dir_lstm'], 'rim': args['log_dir_rim']})
 else:
-	saved = torch.load(log_dir + '/best_model.pt')
-	model.load_state_dict(saved['net'])
-	v_acc = test_model(model, data)
-	print('val_acc:'+str(v_acc))
+    if args['model'] == 'LSTM':
+        model_checkpoint_file = os.path.join(args['log_dir_lstm'], 'lstm_best_model.pt')
+    elif args['model'] == 'RIM':
+        model_checkpoint_file = os.path.join(args['log_dir_rim'], 'rim_best_model.pt')
+    else:
+        raise ValueError('Unsupported model type')
+
+    saved = torch.load(model_checkpoint_file)
+    model.load_state_dict(saved['net'])
+    # Evaluate on all three validation sets
+    validation_functions = [data.val_get1, data.val_get2, data.val_get3]
+    validation_accuracies = []
+
+
+    for func in validation_functions:
+        accuracy = test_model(model, data, func)
+        validation_accuracies.append(accuracy)
+
+    # Print accuracies for all validation sets
+    for i, accuracy in enumerate(validation_accuracies, 1):
+        print(f'Validation Set {i} Accuracy: {accuracy:.2f}%')
+
