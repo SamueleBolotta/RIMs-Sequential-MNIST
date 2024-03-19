@@ -182,7 +182,6 @@ def train_model(model, epochs, data, log_dir):
                 torch.save(state, f)
         else:
             no_improvement_epochs += 1
-
         if no_improvement_epochs >= 15:
             print(f'No improvement in validation accuracies sum for {no_improvement_epochs} epochs, stopping training.')
             break
