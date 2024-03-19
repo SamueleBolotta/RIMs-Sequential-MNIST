@@ -8,10 +8,7 @@ class MnistModel(nn.Module):
 	def __init__(self, args):
 		super().__init__()
 		self.args = args
-		if args['cuda']:
-			self.device = torch.device('cuda')
-		else:
-			self.device = torch.device('cpu')
+		self.device = torch.device('cuda')
 		self.rim_model = RIMCell(self.device, args['input_size'], args['hidden_size'], args['num_units'], args['k'], args['rnn_cell'], args['key_size_input'], args['value_size_input'] , args['query_size_input'],
 			args['num_input_heads'], args['input_dropout'], args['key_size_comm'], args['value_size_comm'], args['query_size_comm'], args['num_input_heads'], args['comm_dropout']).to(self.device)
 		# if torch.cuda.device_count() > 1:
@@ -56,10 +53,7 @@ class LSTM(nn.Module):
 	def __init__(self, args):
 		super().__init__()
 		self.args = args
-		if args['cuda']:
-			self.device = torch.device('cuda')
-		else:
-			self.device = torch.device('cpu')
+		self.device = torch.device('cuda')
 		self.hidden_size = args['hidden_size']
 		self.lstm = nn.LSTMCell(args['input_size'], self.hidden_size)
 		self.Linear = nn.Linear(self.hidden_size, 10)
