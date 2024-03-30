@@ -7,8 +7,10 @@ import numpy as np
 class MnistModel(nn.Module):
     def __init__(self, args):
         super().__init__()
-        self.args = args
-        self.device = torch.device('cuda' if torch.cuda.is_available() and args['cuda'] else 'cpu')
+        if args['cuda']:
+			self.device = torch.device('cuda')
+		else:
+			self.device = torch.device('cpu')
         self.rim_model = RIMCell(
             self.device, args['input_size'], args['hidden_size'], args['num_units'], args['k'], 
             args['rnn_cell'], args['key_size_input'], args['value_size_input'], args['query_size_input'],
@@ -54,7 +56,10 @@ class LSTM(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.device = torch.device('cuda' if torch.cuda.is_available() and args['cuda'] else 'cpu')
+        if args['cuda']:
+			self.device = torch.device('cuda')
+		else:
+			self.device = torch.device('cpu')
         self.hidden_size = args['hidden_size']
         self.lstm = nn.LSTMCell(args['input_size'], self.hidden_size).to(self.device)
         self.Linear = nn.Linear(self.hidden_size, 10).to(self.device)
