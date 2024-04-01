@@ -53,7 +53,7 @@ class LSTM(nn.Module):
 	def __init__(self, args):
 		super().__init__()
 		self.args = args
-		self.device = torch.device('cuda')
+		self.device = torch.device('cuda' if self.args['cuda'] and torch.cuda.is_available() else 'cpu')
 		self.hidden_size = args['hidden_size']
 		self.lstm = nn.LSTMCell(args['input_size'], self.hidden_size)
 		self.Linear = nn.Linear(self.hidden_size, 10)
