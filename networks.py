@@ -8,7 +8,7 @@ class MnistModel(nn.Module):
 	def __init__(self, args):
 		super().__init__()
 		self.args = args
-		self.device = torch.device('cuda')
+		self.device = torch.device('cuda' if self.args['cuda'] and torch.cuda.is_available() else 'cpu')
 		self.rim_model = RIMCell(self.device, args['input_size'], args['hidden_size'], args['num_units'], args['k'], args['rnn_cell'], args['key_size_input'], args['value_size_input'] , args['query_size_input'],
 			args['num_input_heads'], args['input_dropout'], args['key_size_comm'], args['value_size_comm'], args['query_size_comm'], args['num_input_heads'], args['comm_dropout']).to(self.device)
 		# if torch.cuda.device_count() > 1:
