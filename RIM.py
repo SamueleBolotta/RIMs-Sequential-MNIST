@@ -108,7 +108,7 @@ class RIMCell(nn.Module):
 		if comm_value_size != hidden_size:
 			#print('INFO: Changing communication value size to match hidden_size')
 			comm_value_size = hidden_size
-		self.device = device
+		self.device = torch.device('cuda' if self.args['cuda'] and torch.cuda.is_available() else 'cpu')
 		self.hidden_size = hidden_size
 		self.num_units =num_units
 		self.rnn_cell = rnn_cell
@@ -250,10 +250,7 @@ class RIMCell(nn.Module):
 class RIM(nn.Module):
 	def __init__(self, device, input_size, hidden_size, num_units, k, rnn_cell, n_layers, bidirectional, **kwargs):
 		super().__init__()
-		if device == 'cuda':
-			self.device = torch.device('cuda')
-		else:
-			self.device = torch.device('cpu')
+		self.device = torch.device('cuda' if self.args['cuda'] and torch.cuda.is_available() else 'cpu')
 		self.n_layers = n_layers
 		self.num_directions = 2 if bidirectional else 1
 		self.rnn_cell = rnn_cell
